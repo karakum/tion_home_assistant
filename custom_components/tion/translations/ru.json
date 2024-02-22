@@ -1,0 +1,20 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Устройство уже сконфигурировано"
+        },
+        "error": {
+            "invalid_auth": "Неверные данные авторизации"
+        },
+        "step": {
+            "user": {
+                "description": "Введите данные вашей учетной записи TION MagicAir",
+                "data": {
+                    "username": "Логин",
+                    "password": "Пароль",
+                    "scan_interval": "Интервал опроса API"
+                }
+            }
+        }
+    }
+}

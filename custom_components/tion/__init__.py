@@ -1,14 +1,39 @@
 import logging
+from threading import Timer
 
-from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_FILE_PATH
+from homeassistant.const import CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_FILE_PATH, Platform
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
-from tion import TionApi, Breezer, MagicAir
+from tion import TionApi, Breezer, MagicAir, ZonePreset
+from tion.tion import TionZonesPresets, TionZones
 
-from .const import DOMAIN, PLATFORMS, TION_API, BREEZER_DEVICE, MAGICAIR_DEVICE
+from .const import DOMAIN
+
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE, Platform.NUMBER, Platform.SWITCH]
+
+MAGICAIR_DEVICE = "magicair"
+BREEZER_DEVICE = "breezer"
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def debounce(wait):  # https://gist.github.com/walkermatt/2871026
+    """ Decorator that will postpone a functions
+        execution until after wait seconds
+        have elapsed since the last time it was invoked. """
+    def decorator(fn):
+        def debounced(*args, **kwargs):
+            def call_it():
+                fn(*args, **kwargs)
+            try:
+                debounced.t.cancel()
+            except AttributeError:
+                pass
+            debounced.t = Timer(wait, call_it)
+            debounced.t.start()
+        return debounced
+    return decorator
 
 
 async def async_setup(hass, config):
@@ -21,7 +46,7 @@ def create_api(user, password, interval, auth_fname):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Setup DOMAIN as default
-    hass.data.setdefault(TION_API, {})
+    hass.data.setdefault(DOMAIN, {})
 
     user_input = entry.data['user_input']
 
@@ -35,7 +60,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     assert api.authorization, "Couldn't get authorisation data!"
     _LOGGER.info(f"Api initialized with authorization {api.authorization}")
 
-    hass.data[TION_API][entry.entry_id] = api
+    hass.data[DOMAIN][entry.entry_id] = {
+        "api": api,
+        "devices": {},
+        "presets": {},
+    }
 
     # Get the device registry
     device_registry = dr.async_get(hass)
@@ -55,11 +84,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             device_type = BREEZER_DEVICE if type(device) == Breezer else (
                 MAGICAIR_DEVICE if type(device) == MagicAir else None)
             if device_type:
+                hass.data[DOMAIN][entry.entry_id]["devices"][device.guid] = device
                 device_registry.async_get_or_create(
                     config_entry_id=entry.entry_id,
+                    connections={(dr.CONNECTION_NETWORK_MAC, device.mac)},
                     identifiers={(DOMAIN, device.guid)},
                     manufacturer="TION",
                     model=models.get(device.type, "Unknown device"),
+                    hw_version=device.hardware,
+                    sw_version=device.firmware,
+                    suggested_area=device.room,
                     name=device.name,
                 )
             else:
@@ -67,7 +101,57 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         else:
             _LOGGER.info(f"Skipped device {device}, because of 'valid' property")
 
+    zone_presets = await hass.async_add_executor_job(api.get_zone_presets)
+    zone_preset: ZonePreset
+    for zone_preset in zone_presets:
+        if zone_preset.valid:
+            hass.data[DOMAIN][entry.entry_id]["presets"][zone_preset.guid] = ZonePresetWrapper(zone_preset)
+            device_registry.async_get_or_create(
+                config_entry_id=entry.entry_id,
+                identifiers={(DOMAIN, zone_preset.guid)},
+                manufacturer="TION",
+                model="Расписание",
+                suggested_area=zone_preset.room,
+                name=f"{zone_preset.room} {zone_preset.name}",
+            )
+
     # Forward to sensor platform
     await hass.async_create_task(hass.config_entries.async_forward_entry_setups(entry, PLATFORMS))
 
     return True
+
+
+class ZonePresetWrapper(ZonePreset):
+    _delay_save: bool = False
+    _delay_load: bool = False
+
+    def __init__(self, zone_preset: ZonePreset):
+        self._api = zone_preset._api
+        self._zone = zone_preset._zone
+        self._guid = zone_preset._guid
+        super().load()
+
+    def load(self, preset_data: TionZonesPresets = None, zone_data: TionZones = None, force=False):
+        if self._delay_save:
+            self._delay_load = True
+            return self.valid
+
+        res = super().load(preset_data, zone_data, force)
+
+        self._delay_load = False
+
+        return res
+
+    @debounce(5)
+    def send_internal(self) -> bool:
+        res = super().send()
+        self._delay_save = False
+        if self._delay_load:
+            self.load(None, None, True)
+        return res
+
+    def send(self) -> bool:
+        self._delay_save = True
+        self.send_internal()
+
+        return True

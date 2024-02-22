@@ -24,23 +24,22 @@ from tion import (
     Zone,
 )
 
-from . import TION_API, DOMAIN
+from . import DOMAIN
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> bool:
-    tion = hass.data[TION_API][entry.entry_id]
-
     entities = []
-    devices = await hass.async_add_executor_job(tion.get_devices)
-    for device in devices:
+    devices = hass.data[DOMAIN][entry.entry_id]["devices"]
+    for guid in devices:
+        device = devices[guid]
         if device.valid:
             if type(device) == Breezer:
-                entities.append(TionClimate(tion, device.guid))
+                entities.append(TionClimate(device))
 
         else:
             _LOGGER.info(f"Skipped device {device}, because of 'valid' property")
 
-    async_add_entities(entities)
+    async_add_entities(entities, update_before_add=True)
 
     return True
 
@@ -48,10 +47,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class TionClimate(ClimateEntity):
     """Tion climate devices,include air conditioner,heater."""
 
-    def __init__(self, tion, guid):
+    def __init__(self, breezer: Breezer):
         """Init climate device."""
-        self._breezer: Breezer = tion.get_devices(guid=guid)[0]
-        self._zone: Zone = tion.get_zones(guid=self._breezer.zone.guid)[0]
+        self._breezer: Breezer = breezer
+        self._zone: Zone = breezer.zone
         self._attr_temperature_unit = UnitOfTemperature.CELSIUS
         self._enable_turn_on_off_backwards_compatibility = False
         self._attr_supported_features = \

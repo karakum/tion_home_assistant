@@ -1,7 +1,6 @@
-  
- {
+{
   "name": "Tion",
   "country": "RU",
   "render_readme": false,
-  "domains": ["climate", "sensor"]
+  "domains": ["climate", "sensor", "number", "switch"]
 }

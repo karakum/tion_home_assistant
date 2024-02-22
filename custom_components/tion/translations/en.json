@@ -8,7 +8,7 @@
         },
         "step": {
             "user": {
-                "description": "Please enter your TION account credentials:",
+                "description": "Please enter your TION MagicAir account credentials",
                 "data": {
                     "username": "Username",
                     "password": "Password",
