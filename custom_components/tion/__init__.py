@@ -10,7 +10,7 @@ from tion.tion import TionZonesPresets, TionZones
 
 from .const import DOMAIN
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE, Platform.NUMBER, Platform.SWITCH]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.CLIMATE, Platform.NUMBER, Platform.SWITCH]
 
 MAGICAIR_DEVICE = "magicair"
 BREEZER_DEVICE = "breezer"

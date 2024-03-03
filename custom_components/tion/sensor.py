@@ -9,7 +9,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
     SensorEntity,
 )
-from homeassistant.const import UnitOfTemperature, STATE_UNKNOWN, STATE_ON, STATE_OFF
+from homeassistant.const import UnitOfTemperature, STATE_UNKNOWN
 
 from .const import DOMAIN
 from tion import Breezer, MagicAir
@@ -53,9 +53,6 @@ SPEED_SENSOR = {
     STATE_CLASS: SensorStateClass.MEASUREMENT,
     "suggested_display_precision": 0,
 }
-FAN_STATE_SENSOR = {
-    "name": "fan state",
-}
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> bool:
@@ -72,7 +69,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 entities.append(TionSensor(device, TEMP_IN_SENSOR))
                 entities.append(TionSensor(device, TEMP_OUT_SENSOR))
                 entities.append(TionSensor(device, SPEED_SENSOR))
-                entities.append(TionSensor(device, FAN_STATE_SENSOR))
         else:
             _LOGGER.info(f"Skipped device {device}, because of 'valid' property")
 
@@ -127,8 +123,6 @@ class TionSensor(SensorEntity):
             state = self._device.t_out
         elif self._sensor_type == SPEED_SENSOR:
             state = self._device.speed
-        elif self._sensor_type == FAN_STATE_SENSOR:
-            state = STATE_ON if self._device.speed > 0 else STATE_OFF
         return state if self._device.valid else STATE_UNKNOWN
 
     def update(self):

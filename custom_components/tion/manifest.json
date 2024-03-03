@@ -1,7 +1,7 @@
 {
   "domain": "tion",
   "name": "Tion",
-  "version": "2.02",
+  "version": "2.03",
   "documentation": "https://github.com/karakum/tion_home_assistant",
   "requirements": [
     "git+https://github.com/karakum/tion.git@master#tion==1.29"
