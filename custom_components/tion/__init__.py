@@ -18,24 +18,6 @@ BREEZER_DEVICE = "breezer"
 _LOGGER = logging.getLogger(__name__)
 
 
-def debounce(wait):  # https://gist.github.com/walkermatt/2871026
-    """ Decorator that will postpone a functions
-        execution until after wait seconds
-        have elapsed since the last time it was invoked. """
-    def decorator(fn):
-        def debounced(*args, **kwargs):
-            def call_it():
-                fn(*args, **kwargs)
-            try:
-                debounced.t.cancel()
-            except AttributeError:
-                pass
-            debounced.t = Timer(wait, call_it)
-            debounced.t.start()
-        return debounced
-    return decorator
-
-
 async def async_setup(hass, config):
     return True
 
@@ -124,6 +106,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class ZonePresetWrapper(ZonePreset):
     _delay_save: bool = False
     _delay_load: bool = False
+    _t: Timer = None
 
     def __init__(self, zone_preset: ZonePreset):
         self._api = zone_preset._api
@@ -142,7 +125,6 @@ class ZonePresetWrapper(ZonePreset):
 
         return res
 
-    @debounce(5)
     def send_internal(self) -> bool:
         res = super().send()
         self._delay_save = False
@@ -152,6 +134,14 @@ class ZonePresetWrapper(ZonePreset):
 
     def send(self) -> bool:
         self._delay_save = True
-        self.send_internal()
+
+        if self._t is not None:
+            try:
+                self._t.cancel()
+            except AttributeError:
+                pass
+
+        self._t = Timer(5, self.send_internal)
+        self._t.start()
 
         return True
