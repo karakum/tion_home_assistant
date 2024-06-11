@@ -1,10 +1,10 @@
 {
   "domain": "tion",
   "name": "Tion",
-  "version": "2.04",
+  "version": "2.05",
   "documentation": "https://github.com/karakum/tion_home_assistant",
   "requirements": [
-    "git+https://github.com/karakum/tion.git@master#tion==1.29"
+    "git+https://github.com/karakum/tion.git@master#tion==1.30"
   ],
   "iot_class": "cloud_polling",
   "integration_type": "hub",
